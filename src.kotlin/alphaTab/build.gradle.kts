@@ -108,8 +108,42 @@ kotlin {
 android {
     compileSdkVersion(30)
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
+    sourceSets["main"].assets.srcDir("../../font/bravura")
+    sourceSets["test"].java.srcDirs("src/androidTest/kotlin", "../../dist/lib.kotlin/test")
+    sourceSets["androidTest"].manifest.srcFile("src/androidTest/AndroidManifest.xml")
+    sourceSets["androidTest"].java.srcDirs("src/androidTest/kotlin", "../../dist/lib.kotlin/test")
+    sourceSets["androidTest"].assets.srcDirs("../../test-data/", "../../font/bravura")
+
     defaultConfig {
         minSdkVersion(24)
         targetSdkVersion(30)
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    dependencies {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib:1.4.31")
+        implementation("androidx.core:core-ktx:1.3.2")
+        implementation("androidx.appcompat:appcompat:1.2.0")
+        implementation("com.google.android.material:material:1.3.0")
+        testImplementation("junit:junit:4.13.2")
+        androidTestImplementation("androidx.test.ext:junit:1.1.2")
+        androidTestImplementation("androidx.test.espresso:espresso-core:3.3.0")
     }
 }
+
+val fetchTestResultsTask by tasks.registering {
+    group = "reporting"
+    doLast {
+        exec {
+            executable = android.adbExecutable.toString()
+            args = listOf("pull", "/storage/emulated/0/Documents/test-results", "$buildDir/reports/androidTests/connected/")
+        }
+    }
+}
+
+tasks.whenTaskAdded {
+    if(this.name == "connectedDebugAndroidTest") {
+        this.finalizedBy(fetchTestResultsTask)
+    }
+}
+

@@ -1,6 +1,7 @@
 package alphaTab.visualTests
 
 import alphaTab.Settings
+import alphaTab.TestPlatform
 //import alphaTab.TestPlatform
 import alphaTab.TestPlatformPartials
 import alphaTab.core.ecmaScript.Uint8Array
@@ -12,9 +13,14 @@ import alphaTab.model.JsonConverter
 import alphaTab.model.Score
 import alphaTab.rendering.RenderFinishedEventArgs
 import alphaTab.rendering.ScoreRenderer
+import android.graphics.*
+import android.util.Log
+import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.junit.Assert
+import java.io.ByteArrayOutputStream
+import java.nio.IntBuffer
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.contracts.ExperimentalContracts
@@ -35,7 +41,7 @@ public class VisualTestHelperPartials {
             try {
                 val fullInputFile = "test-data/visual-tests/$inputFile"
                 val inputFileData = TestPlatformPartials.loadFile(fullInputFile)
-                val referenceFileName = fullInputFile // TestPlatform.changeExtension(fullInputFile, ".png")
+                val referenceFileName = TestPlatform.changeExtension(fullInputFile, ".png")
                 val score = ScoreLoader.loadScoreFromBytes(inputFileData, settings)
 
                 runVisualTestScore(
@@ -86,6 +92,8 @@ public class VisualTestHelperPartials {
             message: String? = null,
             tolerancePercent: Double = 1.0
         ) {
+            alphaTab.platform.android.AndroidEnvironment.initializeAndroid(InstrumentationRegistry.getInstrumentation().context)
+
             val actualSettings = settings ?: Settings()
             val actualTracks = tracks ?: ArrayList()
 
@@ -129,7 +137,10 @@ public class VisualTestHelperPartials {
             val job = GlobalScope.launch {
                 try {
                     val renderScore =
-                        JsonConverter.jsObjectToScore(JsonConverter.scoreToJsObject(score), settings);
+                        JsonConverter.jsObjectToScore(
+                            JsonConverter.scoreToJsObject(score),
+                            settings
+                        );
                     renderer.renderScore(renderScore, actualTracks)
                 } catch (e: Throwable) {
                     error = e
@@ -166,6 +177,115 @@ public class VisualTestHelperPartials {
             message: String?,
             tolerancePercent: Double = 1.0
         ) {
+            val finalImage = Bitmap.createBitmap(
+                totalWidth.toInt(),
+                totalHeight.toInt(),
+                Bitmap.Config.ARGB_8888,
+                true
+            )
+            val finalImageCanvas = Canvas(finalImage)
+            val point = PointF(0f, 0f)
+            var rowHeight = 0f
+            for (partialResult in result) {
+                val partialCanvas = partialResult.renderResult
+                if (partialCanvas is Bitmap) {
+                    finalImageCanvas.drawBitmap(partialCanvas, point.x, point.y, null)
+                    if(partialResult.height > rowHeight) {
+                        rowHeight = partialResult.height.toFloat()
+                    }
+                    point.x += partialCanvas.width
+                    if(point.x >= totalWidth) {
+                        point.x = 0f
+                        point.y += rowHeight
+                        rowHeight = 0f
+                    }
+                    partialCanvas.recycle()
+                }
+            }
+
+            try {
+                val referenceBitmap =
+                    BitmapFactory.decodeByteArray(referenceFileData.buffer.raw.asByteArray(), 0, referenceFileData.buffer.raw.size)
+
+                var pass:Boolean
+                var msg:String
+                try {
+                    val finalBitmapRaw = toRawBytes(finalImage)
+                    val referenceBitmapRaw = toRawBytes(referenceBitmap)
+
+                    val diffData = Uint8Array(finalBitmapRaw.size.toDouble())
+                    val match = PixelMatch.match(
+                        Uint8Array(referenceBitmapRaw),
+                        Uint8Array(finalBitmapRaw),
+                        diffData,
+                        referenceBitmap.width.toDouble(),
+                        referenceBitmap.height.toDouble(),
+                        PixelMatchOptions().apply {
+                            this.threshold = 0.3
+                            this.includeAA = false
+                            this.diffMask = true
+                            this.alpha = 1.0
+                        })
+
+                    val totalPixels = match.totalPixels - match.transparentPixels
+                    val percentDifference = (match.differentPixels / totalPixels) * 100
+                    pass = percentDifference < tolerancePercent
+
+                    val percentDifferenceText = percentDifference.toInvariantString()
+                    msg =
+                        "Difference between original and new image is too big: ${match.differentPixels}/$totalPixels (${percentDifferenceText}%) $message"
+
+                    if(!pass) {
+                        val diffImageName =
+                            TestPlatform.changeExtension(referenceFileName, ".diff.png")
+
+                        val diff = Bitmap.createBitmap(
+                            referenceBitmap.width,
+                            referenceBitmap.height,
+                            Bitmap.Config.ARGB_8888,
+                            true
+                        )
+
+                        val buffer = java.nio.ByteBuffer.wrap(diffData.buffer.raw.asByteArray())
+                        diff.copyPixelsFromBuffer(buffer)
+                        val diffBos = ByteArrayOutputStream()
+                        diff.compress(Bitmap.CompressFormat.PNG, 100, diffBos)
+                        diff.recycle()
+                        TestPlatformPartials.saveFile(
+                            diffImageName,
+                            Uint8Array(diffBos.toByteArray().asUByteArray())
+                        )
+                    }
+                } catch (e: Throwable) {
+                    pass = false
+                    msg = "Error comparing images:  ${e.message} ${e.stackTraceToString()}, $message"
+                } finally {
+                    referenceBitmap.recycle()
+                }
+
+                val finalImageFileName = TestPlatform.changeExtension(referenceFileName, ".new.png")
+                val bos = ByteArrayOutputStream()
+                finalImage.compress(Bitmap.CompressFormat.PNG, 100, bos)
+                TestPlatformPartials.saveFile(finalImageFileName, Uint8Array(bos.toByteArray().asUByteArray()))
+
+                if (!pass) {
+                    TestPlatformPartials.saveFile(
+                        referenceFileName,
+                        referenceFileData
+                    )
+
+                    Assert.fail(msg)
+                }
+            }
+            finally {
+                finalImage.recycle()
+            }
+        }
+
+        private fun toRawBytes(bitmap: Bitmap): UByteArray {
+            val buffer = java.nio.ByteBuffer.allocate(bitmap.height * bitmap.rowBytes)
+            bitmap.copyPixelsToBuffer(buffer)
+            return buffer.array().asUByteArray()
         }
     }
 }

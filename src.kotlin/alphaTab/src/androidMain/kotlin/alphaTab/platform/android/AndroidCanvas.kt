@@ -24,11 +24,10 @@ const val HangingAsPercentOfAscent = 80
 @ExperimentalUnsignedTypes
 @ExperimentalContracts
 @RequiresApi(Build.VERSION_CODES.Q)
-class AndroidCanvas : ICanvas {
+public class AndroidCanvas : ICanvas {
     companion object {
-        @JvmStatic
-        public fun initialize(context: Context) {
-            MusicFont = ResourcesCompat.getFont(context, net.alphatab.R.raw.bravura)!!
+        public fun initialize(context:Context) {
+            MusicFont = android.graphics.Typeface.createFromAsset(context.assets, "Bravura.ttf")
         }
     }
 
@@ -64,7 +63,7 @@ class AndroidCanvas : ICanvas {
         val newImage = Bitmap.createBitmap(
             width.toInt(),
             height.toInt(),
-            Bitmap.Config.HARDWARE,
+            Bitmap.Config.ARGB_8888,
             true
         )
         _surface = newImage
@@ -247,9 +246,9 @@ class AndroidCanvas : ICanvas {
         // https://github.com/chromium/chromium/blob/99314be8152e688bafbbf9a615536bdbb289ea87/third_party/blink/renderer/core/html/canvas/text_metrics.cc#L14
         return when (textBaseline) {
             TextBaseline.Top -> // kHangingTextBaseline
-                paint.fontMetrics.ascent * HangingAsPercentOfAscent / 100.0f
+                -paint.fontMetrics.ascent * HangingAsPercentOfAscent / 100.0f
             TextBaseline.Middle -> {// kMiddleTextBaseline
-                (paint.fontMetrics.ascent - paint.fontMetrics.descent) / 2.0f
+                (-paint.fontMetrics.ascent - paint.fontMetrics.descent) / 2.0f
             }
             TextBaseline.Bottom -> {// kBottomTextBaseline
                 -paint.fontMetrics.descent
