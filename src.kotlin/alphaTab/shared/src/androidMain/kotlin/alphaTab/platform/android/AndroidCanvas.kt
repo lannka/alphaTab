@@ -9,9 +9,6 @@ import alphaTab.platform.TextAlign
 import alphaTab.platform.TextBaseline
 import android.content.Context
 import android.graphics.*
-import android.os.Build
-import androidx.annotation.RequiresApi
-import androidx.core.content.res.ResourcesCompat
 import kotlin.contracts.ExperimentalContracts
 
 @ExperimentalUnsignedTypes
@@ -21,14 +18,35 @@ const val MusicFontSize = 34
 
 const val HangingAsPercentOfAscent = 80
 
+val CustomTypeFaces = HashMap<String, Typeface>();
+
 @ExperimentalUnsignedTypes
 @ExperimentalContracts
-@RequiresApi(Build.VERSION_CODES.Q)
 public class AndroidCanvas : ICanvas {
     companion object {
         public fun initialize(context:Context) {
             MusicFont = android.graphics.Typeface.createFromAsset(context.assets, "Bravura.ttf")
         }
+
+//        public fun registerCustomFont(data: UByteArray) {
+//            val skData = Data.makeFromBytes(data.asByteArray())
+//            skData.use {
+//                val face = Typeface.makeFromData(skData)
+//                CustomTypeFaces[customTypeFaceKey(face)] = face;
+//            }
+//        }
+//
+//        private fun customTypeFaceKey(typeface: Typeface): String {
+//            return customTypeFaceKey(typeface.familyName, typeface.isBold, typeface.isItalic)
+//        }
+//
+//        private fun customTypeFaceKey(
+//            fontFamily: String,
+//            isBold: Boolean,
+//            isItalic: Boolean
+//        ): String {
+//            return fontFamily.toLowerCase() + "_" + isBold + "_" + isItalic;
+//        }
     }
 
     private lateinit var _surface: Bitmap
@@ -63,9 +81,10 @@ public class AndroidCanvas : ICanvas {
         val newImage = Bitmap.createBitmap(
             width.toInt(),
             height.toInt(),
-            Bitmap.Config.ARGB_8888,
-            true
+            Bitmap.Config.ARGB_8888
         )
+        newImage.isPremultiplied = true
+
         _surface = newImage
         _canvas = Canvas(_surface)
         _path?.close()
@@ -87,7 +106,6 @@ public class AndroidCanvas : ICanvas {
 
     override fun fillRect(x: Double, y: Double, w: Double, h: Double) {
         createPaint().let {
-            it.blendMode = BlendMode.SRC_OVER
             it.style = Paint.Style.FILL
             _canvas.drawRect(
                 RectF(
@@ -110,7 +128,6 @@ public class AndroidCanvas : ICanvas {
 
     override fun strokeRect(x: Double, y: Double, w: Double, h: Double) {
         createPaint().let {
-            it.blendMode = BlendMode.SRC_OVER
             it.style = Paint.Style.STROKE
             _canvas.drawRect(
                 RectF(
