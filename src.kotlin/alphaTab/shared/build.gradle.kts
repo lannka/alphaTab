@@ -46,14 +46,12 @@ kotlin {
             dependencies {
                 implementation("com.google.android.material:material:1.2.1")
             }
-            kotlin.srcDirs("src/jvmCommon/kotlin")
         }
         val androidTest by getting {
             dependencies {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13")
             }
-            kotlin.srcDirs("../../../dist/lib.kotlin/test")
         }
 //        val iosMain by getting
 //        val iosTest by getting
@@ -97,10 +95,26 @@ android {
     compileSdkVersion(30)
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     sourceSets["main"].assets.srcDir("../../../font/bravura")
-
-//    sourceSets["androidTest"].manifest.srcFile("src/androidTest/AndroidManifest.xml")
-//    sourceSets["androidTest"].java.srcDirs("../../../dist/lib.kotlin/test")
-    sourceSets["androidTest"].assets.srcDirs("../../../test-data/", "../../../font/bravura")
+    sourceSets["main"].java.srcDir("src/jvmCommon/kotlin")
+    sourceSets["androidTest"].manifest.srcFile("src/androidTest/AndroidManifest.xml")
+    sourceSets["androidTest"].java.srcDirs("src/androidTest/kotlin", "../../../dist/lib.kotlin/test")
+    sourceSets["androidTest"].assets.srcDirs(
+        "../../../test-data/",
+        "../../../font/bravura",
+        "../../../font/roboto",
+        "../../../font/ptserif"
+    )
+    aaptOptions{
+        ignoreAssetsPattern = arrayOf(
+            "eot",
+            "otf",
+            "svg",
+            "woff",
+            "woff2",
+            "json",
+            "txt"
+        ).joinToString(":") { "!*.${it}" }
+    }
 
     defaultConfig {
         minSdkVersion(24)

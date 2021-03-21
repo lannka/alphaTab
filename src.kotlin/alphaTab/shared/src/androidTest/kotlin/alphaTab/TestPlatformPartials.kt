@@ -22,9 +22,9 @@ import android.content.ContentValues
 import android.os.Environment
 
 import android.R.attr.data
-
-
-
+import android.content.ContentResolver
+import android.content.ContentUris
+import android.os.Bundle
 
 
 @ExperimentalUnsignedTypes
@@ -54,25 +54,51 @@ public class TestPlatformPartials {
             var path = Paths.get(name)
 
             values.put(
-                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.Files.FileColumns.DISPLAY_NAME,
                 path.fileName.toString()
             )
 
             values.put(
-                MediaStore.MediaColumns.MIME_TYPE,
+                MediaStore.Files.FileColumns.MIME_TYPE,
                 "image/png"
             )
 
             values.put(
-                MediaStore.MediaColumns.RELATIVE_PATH,
+                MediaStore.Files.FileColumns.RELATIVE_PATH,
                 "${Environment.DIRECTORY_DOCUMENTS}/test-results/${path.parent}"
             )
 
-            val uri = testContext.contentResolver.insert(
-                MediaStore.Files.getContentUri("external"), values)
+            val existing = testContext.contentResolver.query(
+                MediaStore.Files.getContentUri("external"),
+                arrayOf(MediaStore.Files.FileColumns._ID),
+                Bundle().apply {
+                    putString(
+                        ContentResolver.QUERY_ARG_SQL_SELECTION,
+                        "${MediaStore.Files.FileColumns.RELATIVE_PATH}=? AND ${MediaStore.Files.FileColumns.DISPLAY_NAME}=?"
+                    )
+                    putStringArray(
+                        ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf(
+                            values.getAsString(MediaStore.Files.FileColumns.RELATIVE_PATH),
+                            values.getAsString(MediaStore.Files.FileColumns.DISPLAY_NAME)
+                        )
+                    )
+                },
+                null
+            )
+
+            val uri = if (existing != null && existing.count > 0 && existing.moveToFirst()) {
+                ContentUris.withAppendedId(
+                    MediaStore.Files.getContentUri("external"),
+                    existing.getLong(0)
+                )
+            } else {
+                testContext.contentResolver.insert(
+                    MediaStore.Files.getContentUri("external"), values
+                )!!
+            }
 
             Log.i("AlphaTabTest", "Saving file '$name' to '$uri'")
-            val fs = testContext.contentResolver.openOutputStream(uri!!)
+            val fs = testContext.contentResolver.openOutputStream(uri)
             fs?.use {
                 fs.write(data.buffer.raw.asByteArray())
             }

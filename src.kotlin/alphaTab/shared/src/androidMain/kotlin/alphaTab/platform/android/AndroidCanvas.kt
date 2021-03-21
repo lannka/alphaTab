@@ -1,5 +1,6 @@
 package alphaTab.platform.android
 
+import alphaTab.Logger
 import alphaTab.Settings
 import alphaTab.model.Color
 import alphaTab.model.Font
@@ -24,29 +25,25 @@ val CustomTypeFaces = HashMap<String, Typeface>();
 @ExperimentalContracts
 public class AndroidCanvas : ICanvas {
     companion object {
-        public fun initialize(context:Context) {
+        public fun initialize(context: Context) {
             MusicFont = android.graphics.Typeface.createFromAsset(context.assets, "Bravura.ttf")
         }
 
-//        public fun registerCustomFont(data: UByteArray) {
-//            val skData = Data.makeFromBytes(data.asByteArray())
-//            skData.use {
-//                val face = Typeface.makeFromData(skData)
-//                CustomTypeFaces[customTypeFaceKey(face)] = face;
-//            }
-//        }
-//
-//        private fun customTypeFaceKey(typeface: Typeface): String {
-//            return customTypeFaceKey(typeface.familyName, typeface.isBold, typeface.isItalic)
-//        }
-//
-//        private fun customTypeFaceKey(
-//            fontFamily: String,
-//            isBold: Boolean,
-//            isItalic: Boolean
-//        ): String {
-//            return fontFamily.toLowerCase() + "_" + isBold + "_" + isItalic;
-//        }
+        public fun registerCustomFont(name: String, face: Typeface) {
+            CustomTypeFaces[customTypeFaceKey(name, face)] = face;
+        }
+
+        private fun customTypeFaceKey(name: String, typeface: Typeface): String {
+            return customTypeFaceKey(name, typeface.isBold, typeface.isItalic)
+        }
+
+        private fun customTypeFaceKey(
+            fontFamily: String,
+            isBold: Boolean,
+            isItalic: Boolean
+        ): String {
+            return fontFamily.toLowerCase() + "_" + isBold + "_" + isItalic;
+        }
     }
 
     private lateinit var _surface: Bitmap
@@ -62,12 +59,18 @@ public class AndroidCanvas : ICanvas {
         get() {
             if (_typeFaceCache != font.toCssString(settings.display.scale)) {
                 _typeFaceCache = font.toCssString(settings.display.scale)
-                _typeFace = Typeface.create(
-                    font.family,
-                    if (font.isBold && font.isItalic) Typeface.BOLD_ITALIC
-                    else if (font.isBold) Typeface.BOLD
-                    else Typeface.NORMAL
-                )
+
+                val key = customTypeFaceKey(font.family, font.isBold, font.isItalic)
+                if (!CustomTypeFaces.containsKey(key)) {
+                    _typeFace = Typeface.create(
+                        font.family,
+                        if (font.isBold && font.isItalic) Typeface.BOLD_ITALIC
+                        else if (font.isBold) Typeface.BOLD
+                        else Typeface.NORMAL
+                    )
+                } else {
+                    _typeFace = CustomTypeFaces[key]!!
+                }
             }
             return _typeFace!!
         }
